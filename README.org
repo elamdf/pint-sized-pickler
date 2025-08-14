@@ -1,0 +1,122 @@
+#+title: Pint-Size Pickler
+#+author: Elam Day-Friedland
+
+This project is an attempt at an open-source implementation of a programmable synthesizer+sequencer,
+similar to the [[https://teenage.engineering/store/po-12][PO-12]] from Teenage Engineering.
+
+Not sure what it'll be able to do yet.
+
+* Configurable Sequencer model in Python
+See [[file:src/sequencer.py][sequencer.py]].
+I need to figure out what the memory layout of the configuration looks like.
+
+* Implementation sketch
+
+TODO programming capabilities
+
+TODO synthesized / precomputed sounds + how to modify them at runtime
+
+TODO it would be cool to have a breadboard or some analog component on the back that you could feed with a variable freq/duty cycle driver and use
+
+TODO memory layout
+- probably will end up having precomputed samples and performing dynamic modulation based on per-beat settings
+
+TODO initialization loop
+
+TODO main event loop
+
+* Design log
+
+
+I think a teensy (20+MHz) is fast enough to perform a naive,
+more compose-properties-per-quarter-tone oriented event loop with DMA+portable delay block synchronization.
+
+Although there might be some bit-vector of each effect way to do it,
+i.e. have a 4-bit vector for each effect and compute one measure at a time
+- this might have benefits for spanning tones- e.g. a half note hi-hat hit that decays over its duration
+
+seems like we could just set PDB to be 1/(bpm*4) and either
+- dma every quarter note
+-  dma a (or 4) measure at a time,
+which might be more scalable for complex combinations? (altho maybe it doesn't matter since same waveform)
+
+
+I think we should construct a 4-measure, 4-quarter-tone-granularity waveform to DMA every 4 measures
+- this feels like a reasonable limit for spanning sounds, and is same as what PO-12 supports
+
+
+
+** refs
+The teensy 4.0 uses aarm cortex M7: [[https://arm-software.github.io/CMSIS_5/DSP/html/index.html][here]] is a DSP library
+
+
+https://teenage.engineering/guides/po-12/en
+** Teensy 3.6 DMA -> DAC example
+
+[[https://forum.pjrc.com/index.php?threads/t3-6-dma-and-dac.60738/][source]],
+
+
+The setup code just turns on the DAC, configures the PDB to create timing,
+fills a buffer with 1 cycle of a sine wave,
+then sets up a DMA transfer to send the buffer to the DAC triggered by the PDB (programmable delay block).
+
+Then the loop just turns on the DMA transfer every 5ms.
+
+
+
+#+begin_src cpp
+#include "DMAChannel.h"
+
+DMAChannel dma;
+#define NSAMPLE 120
+uint16_t dac_buffer[NSAMPLE];
+
+#define PDB_CONFIG (PDB_SC_TRGSEL(15) | PDB_SC_PDBEN | PDB_SC_CONT | PDB_SC_PDBIE | PDB_SC_DMAEN)
+#define PDB_PERIOD (1360-1)
+
+void setup() {
+
+  while (!Serial && millis() < 800) ; // wait
+  Serial.println("DAC DMA");
+
+  // put some data into dac_buffer array
+  for (unsigned int i=0; i < NSAMPLE; i++) {
+    float f = (float)i / (float)NSAMPLE;
+    dac_buffer[i] = sinf(f * 2.0 * 3.14159) * 2000.0 + 2000;
+  }
+
+  // turn on DAC hardware
+  SIM_SCGC2 |= SIM_SCGC2_DAC0;
+  DAC0_C0 = DAC_C0_DACEN;                   // 1.2V VDDA is DACREF_2
+
+  // set the programmable delay block to trigger DMA requests
+  SIM_SCGC6 |= SIM_SCGC6_PDB;
+  PDB0_IDLY = 1;
+  PDB0_MOD = PDB_PERIOD;
+  PDB0_SC = PDB_CONFIG | PDB_SC_LDOK;
+  PDB0_SC = PDB_CONFIG | PDB_SC_SWTRIG;
+  PDB0_CH0C1 = 0x0101;
+
+  // DMA will copy dac_buffer to the DAC on each PDB trigger
+  dma.begin();
+  dma.TCD->SADDR = dac_buffer;
+  dma.TCD->SOFF = 2;
+  dma.TCD->ATTR = DMA_TCD_ATTR_SSIZE(1) | DMA_TCD_ATTR_DSIZE(1);
+  dma.TCD->NBYTES_MLNO = 2;
+  dma.TCD->SLAST = -sizeof(dac_buffer);
+  dma.TCD->DADDR = &DAC0_DAT0L;
+  dma.TCD->DOFF = 0;
+  dma.TCD->CITER_ELINKNO = sizeof(dac_buffer) / 2;
+  dma.TCD->DLASTSGA = 0;
+  dma.TCD->BITER_ELINKNO = sizeof(dac_buffer) / 2;
+  dma.TCD->CSR = DMA_TCD_CSR_DREQ; // DREQ flag causes DMA to stop when done
+  //dma.TCD->CSR = 0; // no flags will loop the DMA forever
+  dma.triggerAtHardwareEvent(DMAMUX_SOURCE_PDB);
+}
+
+void loop() {
+  dma.enable();
+  delay(5);
+}
+
+#+end_src
