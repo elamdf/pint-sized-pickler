@@ -4,6 +4,10 @@
 This project is an attempt at an open-source implementation of a programmable synthesizer+sequencer,
 similar to the [[https://teenage.engineering/store/po-12][PO-12]] from Teenage Engineering.
 
+The name is a play on Python's [[https://docs.python.org/3/library/pickle.html][pickle]] module,
+which serializes data (including audio! although it's not the best thing to use for that).
+I hope to turn this into a Teensy-based handheld device at some point(tm).
+
 Not sure what it'll be able to do yet.
 
 * Configurable Sequencer model in Python
