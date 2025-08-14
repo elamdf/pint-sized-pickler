@@ -28,6 +28,23 @@ TODO memory layout
 TODO initialization loop
 
 TODO main event loop
+- loop thru patterns
+
+** data structures sketch
+
+16 synth functions that take 2 parameters, store 2d array of function pointers
+
+
+store the paramters in a 3d array (16 beats by 16 instruments by 2 params)
+
+store an en bitvector for each instrument and each beat
+
+dma is queue based, figure out how to sample +update params on the beat
+
+for each beat, eumerate en vector and invoke with params at index if en,
+accumulate then normalize + global volume/filter and send to DMA
+
+
 
 * Design log
 
@@ -47,6 +64,7 @@ which might be more scalable for complex combinations? (altho maybe it doesn't m
 
 I think we should construct a 4-measure, 4-quarter-tone-granularity waveform to DMA every 4 measures
 - this feels like a reasonable limit for spanning sounds, and is same as what PO-12 supports
+
 
 
 
