@@ -3,18 +3,10 @@
 #include <cmath>
 #include <cstring>
 
-// ===== Float-safe timing constants =====
-static constexpr float SAMPLE_RATE_HZ = AUDIO_SAMPLE_RATE_EXACT; // ~44117.647
-static constexpr float BEATS_PER_MIN   = 200.0f;
-static constexpr float BEATS_PER_MEAS  = 4.0f;
-static constexpr float WINDOW_SIZE_MEAS= 4.0f;
-static constexpr int   N_INSTRUMENTS   = 16;
+#include "instruments.cpp"
+#include "pickle_consts.h"
 
-// Derived (float) timing values
-static constexpr float BEATS_PER_SEC    = BEATS_PER_MIN / 60.0f;
-static constexpr float SAMPLES_PER_BEAT = SAMPLE_RATE_HZ / BEATS_PER_SEC;
-static constexpr float BEAT_LEN_SEC     = 1.0f / BEATS_PER_SEC;
-static constexpr float WINDOW_SIZE_BEATS= BEATS_PER_MEAS * WINDOW_SIZE_MEAS;
+
 
 // Mutable pattern data
 static bool instrument_en[(int)WINDOW_SIZE_MEAS][(int)BEATS_PER_MEAS][N_INSTRUMENTS];
@@ -37,46 +29,7 @@ AudioPlayQueue   queue1;
 AudioOutputI2S   i2s1;
 AudioConnection  patchCord1(queue1, 0, i2s1, 0);
 
-// ===== Synth renderers =====
-using RenderFn = void(*)(float*, size_t, size_t, int, int, int);
 
-static void render_kick_add(float* acc, size_t start, size_t n, int A, int B, int V) {
-  float f0 = (A > 0 ? (float)A : 120.0f);
-  float f1 = (B > 0 ? (float)B : 40.0f);
-  float gain = (float)V * 0.01f;
-  float tau = 0.08f;
-
-  float phase = 0.0f;
-  float a = 1.0f;
-  float k = expf(-1.0f / (tau * SAMPLE_RATE_HZ));
-  float df = (n > 1) ? (f1 - f0) / (float)n : 0.0f;
-  float f = f0;
-
-  for (size_t i = 0; i < n; ++i) {
-    acc[start + i] += sinf(phase) * a * gain;
-    phase += 2.0f * (float)M_PI * f / SAMPLE_RATE_HZ;
-    if (phase >= 2.0f * (float)M_PI) phase -= 2.0f * (float)M_PI;
-    a *= k;
-    f += df;
-  }
-}
-
-static void render_noise_add(float* acc, size_t start, size_t n, int A, int, int V) {
-  float tau = ((A > 0 ? (float)A : 60.0f) / 1000.0f);
-  float gain = (float)V * 0.01f;
-
-  uint32_t rng = 0x1234567u;
-  float a = 1.0f;
-  float k = expf(-1.0f / (tau * SAMPLE_RATE_HZ));
-  for (size_t i = 0; i < n; ++i) {
-    rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
-    float white = ((int)(rng & 0xFFFF) - 32768) / 32768.0f;
-    acc[start + i] += white * a * gain;
-    a *= k;
-  }
-}
-
-static void render_silence(float*, size_t, size_t, int, int, int) {}
 
 // Map instrument index → renderer
 static RenderFn renderers[N_INSTRUMENTS] = {
@@ -122,6 +75,8 @@ static void fill_block_and_queue_one_window() {
   size_t song_len_samples = step_to_abs_sample((int)WINDOW_SIZE_MEAS, 0);
   size_t step_nsamp = step_len_samples();
 
+  // This cast will probably cause jitter/drift between windows.
+  // I do not care.
   for (int meas = 0; meas < (int)WINDOW_SIZE_MEAS; ++meas) {
     for (int beat = 0; beat < (int)BEATS_PER_MEAS; ++beat) {
       size_t hit_start_abs = step_to_abs_sample(meas, beat);
@@ -164,10 +119,19 @@ void setup() {
   memset(instrument_en, 0, sizeof(instrument_en));
   memset(instrument_params, 0, sizeof(instrument_params));
 
-  instrument_en[0][0][0] = true; instrument_params[0][0][0][0] = 120; instrument_params[0][0][0][1] = 40; instrument_params[0][0][0][2] = 100;
-  instrument_en[0][2][1] = true; instrument_params[0][2][1][0] = 60; instrument_params[0][2][1][2] = 80;
+  instrument_en[0][0][KICK] = true;
+  instrument_params[0][0][KICK][0] = 120;
+  instrument_params[0][0][KICK][1] = 40;
+  instrument_params[0][0][KICK][2] = 100;
+
+  instrument_en[0][2][SNARE] = true;
+  instrument_params[0][2][SNARE][0] = 60;
+  instrument_params[0][2][SNARE][2] = 80;
+
   for (int b = 0; b < (int)BEATS_PER_MEAS; ++b) {
-    instrument_en[0][b][2] = true; instrument_params[0][b][2][0] = 20; instrument_params[0][b][2][2] = 50;
+    instrument_en[0][b][HAT] = true;
+    instrument_params[0][b][HAT][0] = 20;
+    instrument_params[0][b][HAT][2] = 50;
   }
 }
 
