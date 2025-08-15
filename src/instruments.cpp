@@ -13,10 +13,18 @@ enum instruments {
   SILENCE
 };
 
+enum buttons {
+  KICK_BUTTON,
+  SNARE_BUTTON,
+  HAT_BUTTON,
+  SILENCE_BUTTON
+};
+
+
 // ===== Synth renderers =====
 using RenderFn = void(*)(float*, size_t, size_t, int, int, int);
 
-static void render_kick_add(float* acc, size_t start, size_t n, int A, int B, int V) {
+static void render_kick(float* acc, size_t start, size_t n, int A, int B, int V) {
   float f0 = (A > 0 ? (float)A : 120.0f);
   float f1 = (B > 0 ? (float)B : 40.0f);
   float gain = (float)V * 0.01f;
@@ -38,7 +46,7 @@ static void render_kick_add(float* acc, size_t start, size_t n, int A, int B, in
 }
 
 
-static void render_noise_add(float* acc, size_t start, size_t n, int A, int, int V) {
+static void render_noise(float* acc, size_t start, size_t n, int A, int, int V) {
   float tau = ((A > 0 ? (float)A : 60.0f) / 1000.0f);
   float gain = (float)V * 0.01f;
 

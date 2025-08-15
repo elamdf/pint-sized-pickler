@@ -24,6 +24,11 @@ static inline size_t step_len_samples() {
   return beats_to_samples(1.0f); // 1 beat per step here
 }
 
+// utility variables
+static size_t song_len_samples = step_to_abs_sample((int)WINDOW_SIZE_MEAS, 0);
+static size_t step_nsamp = step_len_samples();
+
+
 // ===== Audio graph =====
 AudioPlayQueue   queue1;
 AudioOutputI2S   i2s1;
@@ -33,9 +38,9 @@ AudioConnection  patchCord1(queue1, 0, i2s1, 0);
 
 // Map instrument index → renderer
 static RenderFn renderers[N_INSTRUMENTS] = {
-  render_kick_add,  // 0
-  render_noise_add, // 1 (snare)
-  render_noise_add, // 2 (hat)
+  render_kick,  // 0
+  render_noise, // 1 (snare)
+  render_noise, // 2 (hat)
   render_silence,   // 3
   render_silence,   // 4
   render_silence,   // 5
@@ -67,18 +72,20 @@ static inline void limit_and_to_i16(const float* in, int16_t* out, size_t n) {
 static size_t playhead_samples = 0;
 static constexpr int BLOCK_SAMPLES = AUDIO_BLOCK_SAMPLES;
 
-static void fill_block_and_queue_one_window() {
-  float acc[BLOCK_SAMPLES] = {0};
+static void render_block_into(float acc[BLOCK_SAMPLES], size_t playhead_samples) {
 
   size_t block_start = playhead_samples;
   size_t block_end   = playhead_samples + BLOCK_SAMPLES;
-  size_t song_len_samples = step_to_abs_sample((int)WINDOW_SIZE_MEAS, 0);
-  size_t step_nsamp = step_len_samples();
+
+
 
   // This cast will probably cause jitter/drift between windows.
   // I do not care.
   for (int meas = 0; meas < (int)WINDOW_SIZE_MEAS; ++meas) {
     for (int beat = 0; beat < (int)BEATS_PER_MEAS; ++beat) {
+      // TODO(elamdf): dimly drive an LED corresponding to the beat,
+      // perhaps with a shift register or something.
+
       size_t hit_start_abs = step_to_abs_sample(meas, beat);
       size_t hit_end_abs   = hit_start_abs + step_nsamp;
 
@@ -98,16 +105,29 @@ static void fill_block_and_queue_one_window() {
       }
     }
   }
+}
 
-  if (queue1.available() > 0) {
-    int16_t* buf = queue1.getBuffer();
-    limit_and_to_i16(acc, buf, BLOCK_SAMPLES);
+static void pump_audio() {
+
+  // Feed as many blocks as the queue can accept right now.
+
+  while (queue1.available() > 0) {
+    // 1) Render the next block at *current* playhead
+    float acc[AUDIO_BLOCK_SAMPLES] = {0};
+    render_block_into(acc, /*start_sample=*/playhead_samples);
+
+    // 2) Convert + queue
+    int16_t *buf = queue1.getBuffer();
+    limit_and_to_i16(acc, buf, AUDIO_BLOCK_SAMPLES);
     queue1.playBuffer();
-  }
 
-  playhead_samples += BLOCK_SAMPLES;
-  if (playhead_samples >= song_len_samples) {
-    playhead_samples = 0;
+    // 3) Advance ONLY after successful queue
+    playhead_samples += AUDIO_BLOCK_SAMPLES;
+    if (playhead_samples >= song_len_samples) {
+      // also can cause clipping of end of pattern if misaligned
+      playhead_samples = 0;
+    }
+
   }
 }
 
@@ -115,10 +135,12 @@ static void fill_block_and_queue_one_window() {
 void setup() {
   AudioMemory(16);
 
-  // Example: kick on beat 0, snare on beat 2, hat on all beats
+
+  // TODO(elamdf): is this necessary
   memset(instrument_en, 0, sizeof(instrument_en));
   memset(instrument_params, 0, sizeof(instrument_params));
 
+  // kick on beat 0, snare on beat 2, hat on all beats
   instrument_en[0][0][KICK] = true;
   instrument_params[0][0][KICK][0] = 120;
   instrument_params[0][0][KICK][1] = 40;
@@ -136,5 +158,5 @@ void setup() {
 }
 
 void loop() {
-  fill_block_and_queue_one_window();
+  pump_audio();
 }
