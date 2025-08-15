@@ -110,7 +110,7 @@ static void render_block_into(float acc[BLOCK_SAMPLES], size_t playhead_samples)
 static void pump_audio() {
 
   // Feed as many blocks as the queue can accept right now.
-
+  // TODO(elamdf): this creates a variable lag between when buttons are accessible to change config
   while (queue1.available() > 0) {
     // 1) Render the next block at *current* playhead
     float acc[AUDIO_BLOCK_SAMPLES] = {0};
