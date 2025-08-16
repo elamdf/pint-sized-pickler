@@ -3,7 +3,7 @@
 #define PICKLE_CONSTS
 // ===== Float-safe timing constants =====
 static constexpr float SAMPLE_RATE_HZ = AUDIO_SAMPLE_RATE_EXACT; // ~44117.647
-static constexpr float BEATS_PER_MIN   = 200.0f;
+static constexpr float BEATS_PER_MIN   = 120.0f;
 static constexpr float BEATS_PER_MEAS  = 4.0f;
 static constexpr float WINDOW_SIZE_MEAS= 4.0f;
 static constexpr int   N_INSTRUMENTS   = 16;

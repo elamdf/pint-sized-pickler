@@ -10,6 +10,7 @@ enum instruments {
   KICK,
   SNARE,
   HAT,
+  TONE,
   SILENCE
 };
 
@@ -59,6 +60,23 @@ static void render_noise(float* acc, size_t start, size_t n, int A, int, int V) 
     acc[start + i] += white * a * gain;
     a *= k;
   }
+}
+
+static void render_tone(float* acc, size_t start, size_t n_samples, int freq, int perc_active, int V) {
+
+  float gain = (float)V;
+  float phase = start *  2.0f * (float)M_PI * freq / SAMPLE_RATE_HZ;
+
+   while (phase > 2.0f * (float) M_PI) {
+     phase -= 2.0f * (float)M_PI;
+   }
+
+  for (size_t i = 0; i < n_samples; ++i) {
+    acc[start + i] += sinf(phase) * gain;
+    phase += 2.0f * (float)M_PI * freq / SAMPLE_RATE_HZ;
+    if (phase >= 2.0f * (float)M_PI) phase -= 2.0f * (float)M_PI;
+  }
+
 }
 
 static void render_silence(float*, size_t, size_t, int, int, int) {}

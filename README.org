@@ -10,6 +10,33 @@ I hope to turn this into a Teensy-based handheld device at some point(tm).
 
 Not sure what it'll be able to do yet.
 
+* UI
+Currently (untested),
+the beat is visually indicated with an LED set with a timer-driven interrupt.
+
+This feels like it could be a reasonable strategy for sampling pins when the beat hits,
+as long as we can get the jitter between ISR run (pin read) and the audio beat to be low enough.
+
+Not sure what the performance will be like,
+it depends on if we can flush the beat configuration ISR,
+and how far ahead we buffer a pattern on DMA (/ how fast we can refill the queue)
+
+ 32K (dcache size) might be enough to hold all mutable state (since waveforms are JIT generated rather than memoized).
+
+
+
+** ISR
+check if we're holding the 'sound' modifier (TODO should this be totally async/ independent ISR triggered by that button)
+
+check which button, if any is being pressed.
+toggle en for that button
+
+if no instrument is selected,
+flash LED
+else only flash LED if EN is true at that beat for that instrument
+
+
+
 * Configurable Sequencer model in Python
 See [[file:src/sequencer.py][sequencer.py]].
 I need to figure out what the memory layout of the configuration looks like.
