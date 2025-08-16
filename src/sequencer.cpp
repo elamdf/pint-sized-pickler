@@ -196,10 +196,10 @@ for (int m = 0; m < (int)WINDOW_SIZE_MEAS; ++m)
       instrument_params[m][b][TONE][2] = -1;
       instrument_hit_len[m][b][TONE] = beats_to_samples(0.5f);
 
-      // instrument_en[0][0][KICK] = true;
-      // instrument_params[0][0][KICK][0] = 120;
-      // instrument_params[0][0][KICK][1] = 40;
-      // instrument_params[0][0][KICK][2] = 100;
+      instrument_en[0][b][KICK] = true;
+      instrument_params[0][b][KICK][0] = 120;
+      instrument_params[0][b][KICK][1] = 40;
+      instrument_params[0][b][KICK][2] = 100;
       // instrument_en[2][0][KICK] = true;
       // instrument_params[2][0][KICK][0] = 120;
       // instrument_params[2][0][KICK][1] = 40;
