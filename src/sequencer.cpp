@@ -108,6 +108,7 @@ static void render_block_into(float acc[BLOCK_SAMPLES], size_t playhead_samples)
         const size_t rel_start  = abs_start - block_start;
         size_t render_len       = block_end - abs_start;         // cap to block
         const size_t remaining  = hit_end_abs - abs_start;       // cap to remaining hit length
+        size_t position_within_beat = abs_start - hit_start_abs;
         if (render_len > remaining) render_len = remaining;
         if (render_len > BLOCK_SAMPLES - rel_start) render_len = BLOCK_SAMPLES - rel_start;
 
@@ -115,7 +116,7 @@ static void render_block_into(float acc[BLOCK_SAMPLES], size_t playhead_samples)
         const int A = instrument_params[meas][beat][inst][0];
         const int B = instrument_params[meas][beat][inst][1];
         const int V = instrument_params[meas][beat][inst][2];
-        renderers[inst](acc, rel_start, render_len, A, B, V);
+        renderers[inst](acc + rel_start, position_within_beat, render_len, A, B, V);
       }
     }
   }
@@ -190,16 +191,17 @@ for (int m = 0; m < (int)WINDOW_SIZE_MEAS; ++m)
     for (int b = 1; b < (int)BEATS_PER_MEAS; ++b) {
 
 
-      instrument_en[m][b][TONE] = true;
-      instrument_params[m][b][TONE][0] = 400;
-      instrument_params[m][b][TONE][1] = 30;
-      instrument_params[m][b][TONE][2] = -1;
-      instrument_hit_len[m][b][TONE] = beats_to_samples(0.5f);
+      // instrument_en[m][b][TONE] = true;
+      // instrument_params[m][b][TONE][0] = 400;
+      // instrument_params[m][b][TONE][1] = 30;
+      // instrument_params[m][b][TONE][2] = ;
+      // instrument_hit_len[m][b][TONE] = beats_to_samples(0.5f);
 
-      instrument_en[0][b][KICK] = true;
-      instrument_params[0][b][KICK][0] = 120;
-      instrument_params[0][b][KICK][1] = 40;
-      instrument_params[0][b][KICK][2] = 100;
+      instrument_en[m][b][KICK] = true;
+      instrument_params[m][b][KICK][0] = 24;
+      instrument_params[m][b][KICK][1] = 100;
+      instrument_params[m][b][KICK][2] = 40;
+      instrument_hit_len[m][b][KICK] = beats_to_samples(1.0f);
       // instrument_en[2][0][KICK] = true;
       // instrument_params[2][0][KICK][0] = 120;
       // instrument_params[2][0][KICK][1] = 40;

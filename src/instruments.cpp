@@ -36,7 +36,7 @@ static void render_noise(float* acc, size_t start, size_t n, int A, int, int V) 
   for (size_t i = 0; i < n; ++i) {
     rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
     float white = ((int)(rng & 0xFFFF) - 32768) / 32768.0f;
-    acc[start + i] += white * a * gain;
+    acc[i] += white * a * gain;
     a *= k;
   }
 }
@@ -44,14 +44,14 @@ static void render_noise(float* acc, size_t start, size_t n, int A, int, int V) 
 static void render_tone(float* acc, size_t start, size_t n_samples, int freq, int perc_active, int V) {
 
   float gain = (float)V;
-  float phase = start *  2.0f * (float)M_PI * freq / SAMPLE_RATE_HZ;
+  float phase =  2.0f * (float)M_PI * freq / SAMPLE_RATE_HZ;
 
    while (phase > 2.0f * (float) M_PI) {
      phase -= 2.0f * (float)M_PI;
    }
 
   for (size_t i = 0; i < n_samples; ++i) {
-    acc[start + i] += sinf(phase) * gain;
+    acc[i] += sinf(phase) * gain;
     phase += 2.0f * (float)M_PI * freq / SAMPLE_RATE_HZ;
     if (phase >= 2.0f * (float)M_PI) phase -= 2.0f * (float)M_PI;
   }
@@ -67,61 +67,46 @@ static void render_silence(float*, size_t, size_t, int, int, int) {}
 static constexpr float F0_HZ = 80.0f;
 
 // Add a synthesized kick into acc[start..start+n)
-inline void synth_kick_add(float* acc,
-                           size_t start, size_t n,
-                           float sample_rate,
-                           float amp,
-                           float pitch_drop_semitones,  // e.g., 24.f
-                           float decay_ms)              // e.g., 120.f
+static inline void render_kick(float* acc,
+                               size_t position_within_beat,     // NEW
+                               size_t n,
+                               int A, int B, int V)
 {
-  if (!acc || n == 0) return;
+  if (n == 0) return;
 
-  const float tau = decay_ms * 1e-3f;                 // seconds
-  const float g_per_sample = std::exp(-1.0f / (tau * sample_rate));
+  const float sr   = SAMPLE_RATE_HZ;
+  const float amp  = (float)V * 0.01f;        // 0..1
+  const float drop = (float)A;                // semitones
+  const float tau  = ((float)B > 1.f ? (float)B : 1.f) * 1e-3f;  // ms → s, clamp
+  const float f0   = 80.0f;                   // attack freq (can be external)
+  const float fend = f0 * powf(2.0f, -drop / 12.0f);
 
-  // End frequency = F0 * 2^(-drop/12)
-  const float f_end = F0_HZ * std::pow(2.0f, -pitch_drop_semitones / 12.0f);
+  // Shared exponential time constant for amp & pitch
+  const float g_per_sample = expf(-1.0f / (tau * sr));
+  const float log_ratio    = logf(fend / f0);
 
-  // We’ll use a smooth exponential glide from F0 → f_end driven by the same time constant:
-  // f(t) = F0 * exp( ln(f_end/F0) * (1 - exp(-t/tau)) )
-  // Implemented incrementally in the loop with a “time since start” in samples.
-  const float log_ratio = std::log(f_end / F0_HZ);
+  // Pre-advance to t0
+  Serial.println(position_within_beat);
+  float e = powf(g_per_sample, (float)position_within_beat); // e^{-t0/tau} using same g
+  float gain  = amp * e;
+  float phase = 0.0f;
 
-  float phase = 0.0f;        // radians
-  float gain  = amp;         // amplitude envelope (decays by g_per_sample)
-  float t_s   = 0.0f;        // seconds since hit start
+  // If you want exact phase continuity, integrate f from 0..t0 here.
 
   for (size_t i = 0; i < n; ++i) {
-    // exp(-t/tau) using per-sample multiply for speed:
-    // keep a running e^{-t/tau} via the gain’s inverse (both share tau)
-    const float e_minus_t_over_tau = gain / (amp + 1e-20f);  // stable when amp>0
+    // Frequency is driven by e^{-t/tau} which we update multiplicatively
+    const float f = f0 * expf(log_ratio * (1.0f - e));
 
-    // instantaneous frequency from the closed form above:
-    const float f = F0_HZ * std::exp(log_ratio * (1.0f - e_minus_t_over_tau));
+    phase += 2.0f * (float)M_PI * f / sr;
+    if (phase > 2.0f * (float)M_PI) phase -= 2.0f * (float)M_PI;
 
-    // integrate phase and write sample
-    phase += 2.0f * float(M_PI) * f / sample_rate;
-    if (phase > 2.0f * float(M_PI)) phase -= 2.0f * float(M_PI);
 
-    acc[start + i] += gain * sinf(phase);
 
-    // advance envelopes
+
+    acc[i] += gain * sinf(phase);
+
+    // advance both envelopes one sample
+    e    *= g_per_sample;
     gain *= g_per_sample;
-    t_s  += 1.0f / sample_rate;
   }
-}
-
-// Matches: using RenderFn = void(*)(float*, size_t, size_t, int, int, int);
-inline void render_kick(float* acc, size_t start, size_t n,
-                        int A_pitchDropSemi, int B_decayMs, int V_volPct)
-{
-  const float amp = (float)V_volPct * 0.01f;         // 0..1
-  const float pitch_drop_semi = (float)A_pitchDropSemi;
-  const float decay_ms = (float)B_decayMs;
-
-  synth_kick_add(acc, start, n,
-                 SAMPLE_RATE_HZ,         // provided externally
-                 amp,
-                 pitch_drop_semi,
-                 decay_ms);
 }
