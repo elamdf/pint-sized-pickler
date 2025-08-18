@@ -22,10 +22,14 @@ void setup() {
     instrument_params[m][0][KICK][1] = 120;  // B: drop ms
     instrument_params[m][0][KICK][2] = 100;  // V: volume %
 
-    // instrument_en[m][2][KICK] = true;
-    // instrument_params[m][2][KICK][0] = 80;
-    // instrument_params[m][2][KICK][1] = 120;
-    // instrument_params[m][2][KICK][2] = 80;
+    if (m == 3) {
+          instrument_en[m][2][KICK] = true;
+    instrument_params[m][2][KICK][0] = 80;
+    instrument_params[m][2][KICK][1] = 120;
+    instrument_params[m][2][KICK][2] = 80;
+    }
+
+
 
     // // Snare: beat 2
     // instrument_en[m][2][SNARE] = true;
