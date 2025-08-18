@@ -141,6 +141,8 @@ void trigger_hat(int A_decayMs, int /*unused*/, int V_volPct) {
 
 // ---------------- Per-loop updater ----------------
 // Kick pitch glide: f(t) = f0 * exp(-t/tau)
+// Required since teensy audio doesn't provide a native frequency envelope,
+// like it does for an amplitude envelope
 void synths_update() {
   for (int v=0; v<KICK_VOICES; ++v) {
     if (!kickState[v].active) continue;
