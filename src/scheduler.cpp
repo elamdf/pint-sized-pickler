@@ -7,8 +7,8 @@
 #endif
 
 // Pattern tables (row-major measure × beat × instrument)
-bool instrument_en[WINDOW_SIZE_MEAS][BEATS_PER_MEAS][N_INSTRUMENTS];
-int  instrument_params[WINDOW_SIZE_MEAS][BEATS_PER_MEAS][N_INSTRUMENTS][3];
+bool instrument_en[WINDOW_SIZE_MEAS][BEATS_PER_MEAS][STEPS_PER_BEAT][N_INSTRUMENTS];
+int  instrument_params[WINDOW_SIZE_MEAS][BEATS_PER_MEAS][STEPS_PER_BEAT][N_INSTRUMENTS][3];
 
 // Step timer
 static IntervalTimer stepTimer;
@@ -16,7 +16,8 @@ static IntervalTimer beatTimer;
 static IntervalTimer ledTimer;
 static volatile uint32_t stepIndex = 0;
 static volatile uint32_t global_vol_pct = 40;
-static bool tick = false;
+
+static int selected_instrument = KICK;
 
 static float led_beat_pulse_duty_cycle = 0.5f;
 
@@ -31,39 +32,45 @@ static inline float step_period_us() {
 static void  step_isr() {
   const uint32_t steps_per_meas = (uint32_t)(BEATS_PER_MEAS * STEPS_PER_BEAT);
   const uint32_t total_steps    = (uint32_t)(WINDOW_SIZE_MEAS * steps_per_meas);
-  const uint32_t s              = stepIndex % total_steps;
+  const uint32_t step              = stepIndex % total_steps;
 
-  const uint32_t meas        = s / steps_per_meas;
-  const uint32_t stepInMeas  = s % steps_per_meas;
+  const uint32_t meas = step / steps_per_meas;
+  // TODO(elamdf): these modulos operations are probably expensive
+  const uint32_t stepInMeas = step % steps_per_meas;
+  const uint32_t stepInBeat  = step % STEPS_PER_BEAT;
   const uint32_t beat        = stepInMeas / STEPS_PER_BEAT;
 
   // only trigger on beat for now
-  if (stepInMeas % STEPS_PER_BEAT == 0) { // on beat
-    // Fire all instruments scheduled for this (meas, beat)
-    for (int inst = 0; inst < N_INSTRUMENTS; ++inst) {
 
-
-      if (!instrument_en[meas][beat][inst]) continue;
-
-      const int A = instrument_params[meas][beat][inst][0];
-      const int B = instrument_params[meas][beat][inst][1];
-      const int V = (int) ((float)instrument_params[meas][beat][inst][2] * 1/global_vol_pct);
-
-      switch (inst) {
-      case KICK:  trigger_kick(A /*init Hz*/, B /*drop ms*/, V); break;
-      case SNARE: trigger_snare(A /*decay ms*/, 0, V);           break;
-      case HAT:   trigger_hat(A /*decay ms*/,   0, V);           break;
-      default:    /* add other instruments here */               break;
-      }
-
-      if (instrument_en[meas][beat][HAT]) {
-        digitalWrite(LED_BUILTIN, HIGH);  // turn the LED on (HIGH is the voltage level)
-      }
-    }
+  if (instrument_en[meas][beat][stepInBeat][selected_instrument]) {
+    digitalWrite(LED_BUILTIN, HIGH);  // turn the LED on (HIGH is the voltage level)
 
   } else { // if (stepInMeas % STEPS_PER_BEAT == (long)((float)STEPS_PER_BEAT * led_beat_pulse_duty_cycle)) {
     digitalWrite(LED_BUILTIN, LOW);
   }
+
+  // Fire all instruments scheduled for this (meas, beat, step)
+  for (int inst = 0; inst < N_INSTRUMENTS; ++inst) {
+    if (!instrument_en[meas][beat][stepInBeat][inst]) continue;
+
+    const int A = instrument_params[meas][beat][stepInBeat][inst][0];
+    const int B = instrument_params[meas][beat][stepInBeat][inst][1];
+    const int V = (int) ((float)instrument_params[meas][beat][stepInBeat][inst][2] * 1/global_vol_pct);
+
+    switch (inst) {
+    case KICK:  trigger_kick(A, B, V); break;
+    case SNARE: trigger_snare(A, 0, V);           break;
+    case HAT:
+      trigger_hat(A, 0, V);
+      break;
+    case TONE:   trigger_tone(A,   B, V);           break;
+    default:                   break;
+    }
+
+
+  }
+
+
 
   stepIndex++;
 

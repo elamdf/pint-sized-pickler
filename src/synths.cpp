@@ -3,9 +3,17 @@
 // ========= Voice pool sizes =========
 static constexpr int KICK_VOICES  = 3;
 static constexpr int SNARE_VOICES = 3;
-static constexpr int HAT_VOICES   = 4;
+static constexpr int TONE_VOICES   = 4;
+static constexpr int HAT_VOICES = 4;
+
 
 // ========= Audio Objects =========
+AudioSynthWaveform  toneOsc [TONE_VOICES];
+AudioEffectEnvelope toneEnv [TONE_VOICES];
+AudioConnection     toneConn0(toneOsc[0], toneEnv[0]);
+AudioConnection     toneConn1(toneOsc[1], toneEnv[1]);
+AudioConnection toneConn2(toneOsc[2], toneEnv[2]);
+
 // Kick: sine -> env
 AudioSynthWaveform  kickOsc [KICK_VOICES];
 AudioEffectEnvelope kickEnv [KICK_VOICES];
@@ -31,7 +39,8 @@ AudioConnection      hatConn3(hatNoise[3], hatEnv[3]);
 // Mixers -> I2S (mono summed to L/R)
 AudioMixer4 mixA;   // kick(0..2), snare(0)
 AudioMixer4 mixB;   // snare(1..2), hat(0..1)
-AudioMixer4 mixC;   // hat(2..3)
+AudioMixer4 mixC;   // hat(2..3) and tone(0)
+AudioMixer4 mixD;   // tone(1..2)
 AudioMixer4 mixSUM;
 
 AudioConnection mixA0(kickEnv[0], 0, mixA, 0);
@@ -45,11 +54,18 @@ AudioConnection mixB2(hatEnv[0],  0, mixB, 2);
 AudioConnection mixB3(hatEnv[1],  0, mixB, 3);
 
 AudioConnection mixC0(hatEnv[2],  0, mixC, 0);
-AudioConnection mixC1(hatEnv[3],  0, mixC, 1);
+AudioConnection mixC1(hatEnv[3], 0, mixC, 1);
+AudioConnection mixC2(toneEnv[0], 0, mixC, 2);
+AudioConnection mixC3(toneEnv[1], 0, mixC, 3);
+
+AudioConnection mixD0(toneEnv[2], 0, mixD, 0);
+AudioConnection mixD1(toneEnv[3], 0, mixD, 0);
+
 
 AudioConnection sumA(mixA,  0, mixSUM, 0);
 AudioConnection sumB(mixB,  0, mixSUM, 1);
-AudioConnection sumC(mixC,  0, mixSUM, 2);
+AudioConnection sumC(mixC, 0, mixSUM, 2);
+AudioConnection sumD(mixD,  0, mixSUM, 2);
 
 AudioOutputI2S i2s1;
 AudioConnection outL(mixSUM, 0, i2s1, 0);
@@ -70,6 +86,7 @@ static KickState kickState[KICK_VOICES];
 
 static volatile uint8_t kickIdx  = 0;
 static volatile uint8_t snareIdx = 0;
+static volatile uint8_t toneIdx = 0;
 static volatile uint8_t hatIdx   = 0;
 
 static inline float clamp01(float x){ return x<0.f?0.f:(x>1.f?1.f:x); }
@@ -114,6 +131,31 @@ void trigger_kick(int A_initFreqHz, int B_dropMs, int V_volPct) {
   kickState[v].tau_ms = dms;
   kickState[v].max_ms = max(5.f, dms * 3.f);
 }
+
+void trigger_tone(int A_freq_hz, int B_ramp_us, int V_volPct) {
+  // B_ramp_pct is what pct of the step should be spent ramping (attack/release)
+  // TODO(elamdf): using actual toneidx causes random tones to get dropped.
+  // I should figure
+  const uint8_t v =  0;// toneIdx; toneIdx = (toneIdx + 1) % TONE_VOICES;
+  const float dms = (float)max(1, B_ramp_us);
+  const float amp = clamp01((float)V_volPct * 0.01f);
+
+
+    toneEnv[v].attack(330);
+    toneEnv[v].hold(2);
+    toneEnv[v].decay(10);
+
+toneEnv[v].sustain(0.0);
+toneEnv[v].release(0);
+
+  toneEnv[v].noteOn();
+
+  toneOsc[v].amplitude(amp);
+  toneOsc[v].frequency(A_freq_hz);
+  toneOsc[v].begin(WAVEFORM_TRIANGLE);
+}
+
+
 
 // Snare: A = decay ms, V = volume %
 void trigger_snare(int A_decayMs, int /*unused*/, int V_volPct) {

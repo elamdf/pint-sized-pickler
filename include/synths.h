@@ -11,3 +11,4 @@ void synths_update();        // call often (glides envelopes/pitch etc.)
 void trigger_kick(int A_initFreqHz, int B_dropMs, int V_volPct);
 void trigger_snare(int A_decayMs, int /*unused*/, int V_volPct);
 void trigger_hat(int A_decayMs, int /*unused*/, int V_volPct);
+void trigger_tone(int A_freq_hz, int B_ramp_ms, int V_volPct);
