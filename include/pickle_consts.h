@@ -13,7 +13,7 @@ inline constexpr int   WINDOW_SIZE_STEPS = WINDOW_SIZE_BEATS * STEPS_PER_BEAT;
 
 // -------- Timing (float math) --------
 inline constexpr float SAMPLE_RATE_HZ   = AUDIO_SAMPLE_RATE_EXACT; // ~44117.647
-inline constexpr float BEATS_PER_MIN    = 120.0f;
+inline constexpr float BEATS_PER_MIN    = 125.0f;
 inline constexpr float BEATS_PER_SEC    = BEATS_PER_MIN / 60.0f;
 inline constexpr float SAMPLES_PER_BEAT = SAMPLE_RATE_HZ / BEATS_PER_SEC;
 inline constexpr float BEAT_LEN_SEC     = 1.0f / BEATS_PER_SEC;

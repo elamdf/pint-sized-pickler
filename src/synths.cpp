@@ -141,9 +141,9 @@ void trigger_tone(int A_freq_hz, int B_ramp_us, int V_volPct) {
   const float amp = clamp01((float)V_volPct * 0.01f);
 
 
-    toneEnv[v].attack(330);
+    toneEnv[v].attack(10);
     toneEnv[v].hold(2);
-    toneEnv[v].decay(10);
+    toneEnv[v].decay(dms);
 
 toneEnv[v].sustain(0.0);
 toneEnv[v].release(0);

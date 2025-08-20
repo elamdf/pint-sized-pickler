@@ -77,7 +77,7 @@ static void  step_isr() {
 
 }
 
-void scheduler_begin() {
+void scheduler_init() {
   // Clear pattern tables
   memset(instrument_en,     0, sizeof(instrument_en));
   memset(instrument_params, 0, sizeof(instrument_params));
